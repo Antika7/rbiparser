@@ -1,5 +1,6 @@
 import click
 import rbiparser as rbi
+from rbiparser.exceptions import RBIParserError
 
 SOURCE_URL = "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=2009"
 
@@ -20,7 +21,10 @@ def cli():
 	help="Etags file")
 def download(source, dest, etag):
 	"""Download all listed bank documents from RBI as .xlsx format."""
-	rbi.download_all(source, dest, etag)
+	try:
+		rbi.download_all(source, dest, etag)
+	except RBIParserError as e:
+		raise click.ClickException(str(e))
 
 
 @cli.command()
@@ -30,7 +34,10 @@ def download(source, dest, etag):
 	help="Target directory for CSV files.")
 def convert(source, dest):
 	"""Convert all xls documents to CSV"""
-	rbi.convert_all(source, dest, rbi.HEADERS)
+	try:
+		rbi.convert_all(source, dest, rbi.HEADERS)
+	except RBIParserError as e:
+		raise click.ClickException(str(e))
 
 
 @cli.command()
