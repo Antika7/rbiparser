@@ -25,6 +25,8 @@ import os
 import glob
 import string
 
+from rbiparser.exceptions import RBIParserError, DownloadError, ParseError, StorageError
+
 try:
 	from urlparse import urlparse
 except ImportError:
@@ -73,14 +75,14 @@ def get_sheet_urls(url):
 	"""Scrapes the RBI page and gets the list of .xlsx sheets."""
 	r = requests.get(url)
 	if r.status_code != 200:
-		raise Exception("Invalid response from", url)
+		raise DownloadError(f"Invalid response from {url}")
 
 	# Extract the urls.
 	s = soup(r.content, "lxml")
 	links = s.findAll("a", href=re.compile("\.xlsx$"))
 
 	if len(links) < 1:
-		raise Exception("Couldn't find any .xlsx urls")
+		raise ParseError("Couldn't find any .xlsx urls")
 
 	return [l["href"] for l in links]
 
@@ -90,7 +92,7 @@ def convert_xlsx_to_csv(src, target, headers):
 	try:
 		sheet = xlrd.open_workbook(src).sheet_by_index(0)
 	except Exception as e:
-		raise Exception("Can't open sheet.", str(e))
+		raise ParseError(f"Can't open sheet: {e}")
 
 	with open(target, "wb") as cf:
 		writer = csv.writer(cf, quoting=csv.QUOTE_ALL)
@@ -108,11 +110,11 @@ def convert_xlsx_to_csv(src, target, headers):
 					first = True
 
 					if len(vals) != len(headers):
-						raise Exception("Headers don't match.")
+						raise ParseError("Headers don't match")
 
 				writer.writerow(vals)
 		except Exception as e:
-			raise Exception("Can't convert sheet.", str(e))
+			raise ParseError(f"Can't convert sheet: {e}")
 
 
 def url_to_file(url):
@@ -135,7 +137,7 @@ def save_etags(etags, fname):
 		with open(fname, "w") as f:
 			f.write(json.dumps(etags, indent=4))
 	except Exception as e:
-		raise Exception("Could not write to " + fname + ": " + str(e))
+		raise StorageError(f"Could not write to {fname}: {e}")
 
 
 def get_url_headers(url):
@@ -144,7 +146,7 @@ def get_url_headers(url):
 		r = requests.head(url)
 		return r.headers
 	except Exception as e:
-		raise Exception("Can't reach", url, ": ", str(e))
+		raise DownloadError(f"Can't reach {url}: {e}")
 
 
 def download(url, target):
@@ -153,7 +155,7 @@ def download(url, target):
 		r = requests.get(url, stream=True)
 		r.raw.decode_content = True
 	except Exception as e:
-		raise Exception("Can't download", url, ": ", str(e))
+		raise DownloadError(f"Can't download {url}: {e}")
 
 	try:
 		with open(target, "wb") as f:
@@ -161,7 +163,7 @@ def download(url, target):
 				if chunk:
 					f.write(chunk)
 	except Exception as e:
-		raise Exception("Can't write ", target, ": ", str(e))
+		raise StorageError(f"Can't write to {target}: {e}")
 
 	return {
 		"etag": r.headers.get("etag", ""),
